@@ -1600,7 +1600,12 @@ async fn deploy_reflex_auto_recovers_after_invalid_kws_rejection_and_fences_stal
                     values,
                     ..
                 } => {
-                    applied_gen_ref.store(block_generation, Ordering::SeqCst);
+                    // The gateway's bundle counter is independent of Core's
+                    // config transaction counter, and lives in active_values.
+                    let bundle_generation = block_generation + 100;
+                    let mut values = values;
+                    values["kws_generation"] = json!(bundle_generation);
+                    applied_gen_ref.store(bundle_generation, Ordering::SeqCst);
                     rev += 1;
                     send_gw(
                         &mut wr,
@@ -1648,7 +1653,7 @@ async fn deploy_reflex_auto_recovers_after_invalid_kws_rejection_and_fences_stal
     );
     assert_eq!(applied_gen.load(Ordering::SeqCst), 0);
 
-    // 2. Second deploy succeeds and activates generation `g`.
+    // 2. Second deploy succeeds and activates KWS bundle generation `g`.
     let ok = state
         .voice
         .deploy_reflex_auto("dot2-d")

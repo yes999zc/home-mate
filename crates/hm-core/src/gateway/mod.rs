@@ -2378,10 +2378,14 @@ impl DeviceHub {
                         .devices
                         .get(&device)
                         .and_then(|d| d.config_blocks.get(&ConfigBlock::Kws))
-                        .filter(|b| {
-                            b.state == ConfigReceiptStatus::Active && b.block_generation > 0
-                        })
-                        .map(|b| b.block_generation);
+                        .filter(|b| b.state == ConfigReceiptStatus::Active)
+                        // Config transactions and KWS bundles have independent
+                        // counters. Only compare the bundle counter reported
+                        // by the gateway with Keyword.kws_generation.
+                        .and_then(|b| b.active_values.as_ref())
+                        .and_then(|v| v.get("kws_generation"))
+                        .and_then(serde_json::Value::as_u64)
+                        .filter(|generation| *generation > 0);
                     if let Some(active_gen) = active_kws_gen {
                         if kw_gen < active_gen {
                             st.record(

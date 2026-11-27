@@ -562,12 +562,12 @@ mod d0_source_tests {
                 ConfigBlock::Kws,
                 ConfigBlockState {
                     block: ConfigBlock::Kws,
-                    block_generation: 5,
+                    block_generation: 331,
                     operation_id: "op-5".into(),
                     data_epoch: 1,
                     persisted_hash: Some("h5".into()),
                     active_hash: Some("h5".into()),
-                    active_values: Some(json!({})),
+                    active_values: Some(json!({"kws_generation": 5, "bundle_id": "b5"})),
                     evidence: Some(json!({})),
                     state: ConfigReceiptStatus::Active,
                     reason: None,
@@ -608,7 +608,8 @@ mod d0_source_tests {
             "stale_kws_keyword must be recorded"
         );
 
-        // Current KWS generation (5 >= 5) must pass through.
+        // Config transaction 331 and KWS bundle generation 5 are independent.
+        // The current bundle must pass even after many config transactions.
         hub.handle_frame(1, mk_kw("current-word", Some(5)));
         match rx.try_recv().expect("current generation keyword emitted") {
             DeviceEvent::Keyword { keyword, .. } => assert_eq!(keyword, "current-word"),
@@ -620,6 +621,34 @@ mod d0_source_tests {
         match rx.try_recv().expect("legacy keyword emitted") {
             DeviceEvent::Keyword { keyword, .. } => assert_eq!(keyword, "legacy-word"),
             other => panic!("expected DeviceEvent::Keyword, got {other:?}"),
+        }
+
+        // A newly loaded bundle may report a keyword before its receipt arrives.
+        hub.handle_frame(1, mk_kw("newer-bundle", Some(6)));
+        assert!(
+            matches!(rx.try_recv(), Ok(DeviceEvent::Keyword { keyword, .. }) if keyword == "newer-bundle")
+        );
+
+        // Older or incomplete receipts have no usable bundle counter. Never
+        // substitute the unrelated transaction counter for missing metadata.
+        for values in [
+            None,
+            Some(json!({})),
+            Some(json!({"kws_generation": 0})),
+            Some(json!({"kws_generation": "invalid"})),
+        ] {
+            hub.lock_state()
+                .devices
+                .get_mut("dot2-d")
+                .unwrap()
+                .config_blocks
+                .get_mut(&ConfigBlock::Kws)
+                .unwrap()
+                .active_values = values;
+            hub.handle_frame(1, mk_kw("missing-bundle-counter", Some(5)));
+            assert!(
+                matches!(rx.try_recv(), Ok(DeviceEvent::Keyword { keyword, .. }) if keyword == "missing-bundle-counter")
+            );
         }
     }
 
