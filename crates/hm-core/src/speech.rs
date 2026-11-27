@@ -97,7 +97,9 @@ pub trait TtsClient: Send + Sync {
             let mut mono = Vec::with_capacity(pcm.len() / usize::from(channels));
             for frame in pcm.chunks_exact(frame_bytes) {
                 let sum: i64 = frame
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|s| i64::from(i16::from_le_bytes([s[0], s[1]])))
                     .sum();
                 mono.extend_from_slice(&((sum / i64::from(channels)) as i16).to_le_bytes());

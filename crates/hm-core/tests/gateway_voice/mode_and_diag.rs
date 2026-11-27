@@ -1332,6 +1332,15 @@ async fn self_echo_gate_covers_direct_plays_and_tail() {
 /// chunks, the stream closes at Answer — and no whole-WAV Play is sent.
 #[tokio::test]
 async fn streamed_answer_rides_one_stream_with_contiguous_seq() {
+    let sentences = ["今天天气不错。", "适合出去走走。", "记得多喝水。"];
+    let mut expected_pcm_bytes = 0usize;
+    for sentence in sentences {
+        let audio =
+            hm_core::speech::TtsClient::synthesize(&hm_core::speech::MockTts::default(), sentence)
+                .await
+                .unwrap();
+        expected_pcm_bytes += hm_core::speech::wav_pcm(&audio.wav).unwrap().2.len();
+    }
     let llm = FakeLlm::new(vec![Scripted::Text {
         chunks: vec![
             "今天天气不错。".into(),
@@ -1383,6 +1392,7 @@ async fn streamed_answer_rides_one_stream_with_contiguous_seq() {
             assert_eq!(text.as_deref(), Some("今天天气不错。"));
             // One stream for the whole answer: collect until its end.
             let mut expect_seq = 0u64;
+            let mut received_pcm_bytes = 0usize;
             loop {
                 match gw
                     .until(|f| match f {
@@ -1406,6 +1416,8 @@ async fn streamed_answer_rides_one_stream_with_contiguous_seq() {
                             .decode(audio_b64)
                             .expect("chunk pcm b64");
                         assert!(!pcm.is_empty(), "chunks carry real audio");
+                        assert!(pcm.len() <= 8192, "fallback PCM chunks stay bounded");
+                        received_pcm_bytes += pcm.len();
                     }
                     CoreFrame::PlayEnd { task_id: t } => {
                         assert_eq!(t, task_id);
@@ -1414,9 +1426,9 @@ async fn streamed_answer_rides_one_stream_with_contiguous_seq() {
                     f => panic!("unexpected frame {f:?}"),
                 }
             }
-            // MockTts pushes one piece per segment: three sentences →
-            // exactly three chunks.
-            assert_eq!(expect_seq, 3, "three sentence segments, one piece each");
+            // Sentence boundaries need not be transport chunk boundaries.
+            // Every sample from all three segments must arrive, in one stream.
+            assert_eq!(received_pcm_bytes, expected_pcm_bytes);
         }
         f => panic!("expected play_begin, got {f:?}"),
     }
