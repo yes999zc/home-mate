@@ -71,25 +71,52 @@ pub trait TtsClient: Send + Sync {
     /// v0.3 (D/T3): streaming synthesis — PCM pieces are pushed to
     /// `on_pcm` as the provider yields them, and the FULL audio is still
     /// returned at the end (accounting/trace keep one shape). Providers
-    /// without a streaming API inherit the default: one piece with the
-    /// whole buffer (correct, just not incremental).
+    /// without a streaming API inherit the default: synthesize the whole WAV,
+    /// then emit bounded mono PCM pieces with the same samples.
     async fn synthesize_streaming(
         &self,
         text: &str,
         on_pcm: &tokio::sync::mpsc::UnboundedSender<TtsPiece>,
     ) -> Result<TtsAudio, SpeechError> {
         let audio = self.synthesize(text).await?;
-        // Strip the 44-byte WAV header the whole-path builds: pieces are
-        // bare PCM at the declared rate.
-        let pcm = audio
-            .wav
-            .get(44..)
-            .map(|s| s.to_vec())
-            .unwrap_or_else(|| audio.wav.clone());
-        let _ = on_pcm.send(TtsPiece {
-            sample_rate: audio.sample_rate,
-            pcm,
-        });
+        let (sample_rate, channels, pcm) = wav_pcm(&audio.wav)
+            .ok_or_else(|| SpeechError::Protocol("TTS WAV has no parseable PCM data".into()))?;
+        let frame_bytes = usize::from(channels) * 2;
+        if sample_rate == 0 || frame_bytes == 0 || pcm.len() % frame_bytes != 0 {
+            return Err(SpeechError::Protocol(
+                "TTS WAV has invalid PCM frame geometry".into(),
+            ));
+        }
+        // RIFF metadata can precede or follow data; a fixed 44-byte offset
+        // would play metadata as sound. Stream the data chunk only.
+        let mono = if channels == 1 {
+            std::borrow::Cow::Borrowed(pcm)
+        } else {
+            // PlayBegin's voice stream is mono. Preserve frame timing when a
+            // provider returns stereo instead of interpreting channels as time.
+            let mut mono = Vec::with_capacity(pcm.len() / usize::from(channels));
+            for frame in pcm.chunks_exact(frame_bytes) {
+                let sum: i64 = frame
+                    .chunks_exact(2)
+                    .map(|s| i64::from(i16::from_le_bytes([s[0], s[1]])))
+                    .sum();
+                mono.extend_from_slice(&((sum / i64::from(channels)) as i16).to_le_bytes());
+            }
+            std::borrow::Cow::Owned(mono)
+        };
+        // Match the whole-WAV gateway path's frame bound; long replies must
+        // not be encoded as one giant PlayChunk.
+        for chunk in mono.chunks(8192) {
+            on_pcm
+                .send(TtsPiece {
+                    sample_rate,
+                    pcm: chunk.to_vec(),
+                })
+                .map_err(|_| SpeechError::Protocol("TTS stream consumer closed".into()))?;
+            // Let the forwarder and socket writer drain between chunks rather
+            // than filling the bounded outbound queue in one synchronous poll.
+            tokio::task::yield_now().await;
+        }
         Ok(audio)
     }
     fn provider(&self) -> &str;
@@ -687,6 +714,106 @@ pub fn asr_from_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FixtureTts(TtsAudio);
+
+    #[async_trait::async_trait]
+    impl TtsClient for FixtureTts {
+        async fn synthesize(&self, _text: &str) -> Result<TtsAudio, SpeechError> {
+            Ok(self.0.clone())
+        }
+        fn provider(&self) -> &str {
+            "fixture"
+        }
+    }
+
+    #[tokio::test]
+    async fn default_streaming_preserves_pcm_with_extra_riff_chunks() {
+        let pcm: Vec<u8> = (0..24_000i16).flat_map(i16::to_le_bytes).collect();
+        let mut wav = pcm_to_wav(&pcm, 24_000, 1);
+        // A legal metadata chunk shifts data beyond the common 44-byte header.
+        wav.splice(36..36, *b"JUNK\x04\x00\x00\x00meta");
+        let riff_len = (wav.len() - 8) as u32;
+        wav[4..8].copy_from_slice(&riff_len.to_le_bytes());
+        let tts = FixtureTts(TtsAudio {
+            wav,
+            sample_rate: 24_000,
+            channels: 1,
+            duration_ms: 1000,
+            provider: "fixture".into(),
+            voice: "fixture".into(),
+        });
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let audio = tts.synthesize_streaming("fixture", &tx).await.unwrap();
+        let mut received = Vec::new();
+        let mut sizes = Vec::new();
+        while let Ok(piece) = rx.try_recv() {
+            assert_eq!(piece.sample_rate, 24_000);
+            sizes.push(piece.pcm.len());
+            received.extend(piece.pcm);
+        }
+        assert_eq!(
+            received.len(),
+            pcm.len(),
+            "RIFF metadata must never become speech samples"
+        );
+        assert_eq!(received, pcm);
+        assert!(sizes.iter().all(|size| *size <= 8192));
+        assert_eq!(audio.wav, tts.0.wav);
+    }
+
+    fn fixture_tts(pcm: &[u8], sample_rate: u32, channels: u16) -> FixtureTts {
+        FixtureTts(TtsAudio {
+            wav: pcm_to_wav(pcm, sample_rate, channels),
+            sample_rate,
+            channels,
+            duration_ms: 0,
+            provider: "fixture".into(),
+            voice: "fixture".into(),
+        })
+    }
+
+    #[tokio::test]
+    async fn default_streaming_downmixes_stereo_without_changing_frame_count() {
+        let pcm: Vec<u8> = [1000i16, -1000, 3000, 1000, i16::MAX, i16::MAX]
+            .into_iter()
+            .flat_map(i16::to_le_bytes)
+            .collect();
+        let tts = fixture_tts(&pcm, 24000, 2);
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        tts.synthesize_streaming("fixture", &tx).await.unwrap();
+        let piece = rx.try_recv().unwrap();
+        let expected: Vec<u8> = [0i16, 2000, i16::MAX]
+            .into_iter()
+            .flat_map(i16::to_le_bytes)
+            .collect();
+        assert_eq!(piece.pcm, expected);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn default_streaming_rejects_invalid_audio_and_closed_consumer() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut tts = fixture_tts(&[0, 1], 24000, 1);
+        tts.0.wav = b"not a WAV file".to_vec();
+        assert!(tts.synthesize_streaming("fixture", &tx).await.is_err());
+        assert!(rx.try_recv().is_err());
+        for (pcm, rate, channels) in [
+            (&[1u8][..], 24000, 1),
+            (&[0, 0][..], 0, 1),
+            (&[0, 0][..], 24000, 0),
+        ] {
+            assert!(fixture_tts(pcm, rate, channels)
+                .synthesize_streaming("fixture", &tx)
+                .await
+                .is_err());
+        }
+        drop(rx);
+        assert!(fixture_tts(&[0, 0], 24000, 1)
+            .synthesize_streaming("fixture", &tx)
+            .await
+            .is_err());
+    }
 
     #[test]
     fn pcm_to_wav_header_is_valid_riff() {
