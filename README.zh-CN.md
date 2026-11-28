@@ -74,10 +74,10 @@ flowchart TD
     D2 --> D3["部署：./tools/hm-provision.sh (--dry-run → 正式激活) → :8930 配对<br/>👉 走轨道 B &amp; Dot 2 端到端 AI 提示词"]
 
     LX06 --> L0["前提：open-xiaoai 开 Root SSH → 查 MemTotal"]
-    L0 -->|"≥ 180,000 kB (256 MB)"| L256["本机满血双唤醒（无需 NAS）<br/>👉 轨道 A1 &amp; LX06 AI 提示词"]
-    L0 -->|"< 180,000 kB (128 MB)"| L128{"家里有常开 NAS / 电脑吗？"}
-    L128 -->|"有（推荐 · 享 Silero VAD）"| LThin["轨道 C 全量 Docker Core + v0.0.56 免编译 --thin<br/>👉 轨道 A2 &amp; LX06 AI 提示词"]
-    L128 -->|"无（单机尝鲜 · 能量 VAD）"| LAsr["v0.0.56 免编译 --standalone-asr（免本地 KWS）<br/>👉 轨道 A3 &amp; LX06 AI 提示词"]
+    L0 -->|"≥ 180,000 kB (256 MB · 已实机验收)"| L256["本机满血双唤醒（无需 NAS）<br/>👉 轨道 A1 &amp; LX06 AI 提示词"]
+    L0 -->|"< 180,000 kB (128 MB · 实验性)"| L128{"实验性支持：家里有常开 NAS 吗？"}
+    L128 -->|"有（实验性 --thin）"| LThin["轨道 C 全量 Docker Core + v0.0.56 --thin（实验性）<br/>👉 轨道 A2 &amp; LX06 AI 提示词"]
+    L128 -->|"无（不推荐日常使用）"| LAsr["v0.0.56 --standalone-asr（内存极紧·仅作实验参考）<br/>👉 轨道 A3（更推荐 256 MB 或安卓终端）"]
 
     Android --> A1["前提：轨道 C 在 NAS/电脑跑全量 Docker Core（或连已有音箱 Core 做管理）"]
     A1 --> A2["安装 v2.3.19 签名 APK（64位手机 full-arm64 / 32位86屏·R1 universal / 遥控 slim）"]
@@ -89,10 +89,17 @@ flowchart TD
 | 你手头的设备 | 前置条件 | 推荐架构组合 | 是否需要常开 NAS / 服务器？ | 直达教程 |
 | :--- | :--- | :--- | :--- | :--- |
 | **亚马逊 Echo Dot 2 (`RS03QR` / `AEOBC`)** | `firebreak` 解锁（备 `p10`）+ 上游 **EchoMuse `emOS`** + `em-wifi` | 音箱本体全量 `hm-core` + `hm-gateway` + `hm-kws`（7 麦 + 160ms AEC + 12 颗灯环） | **不需要**（100% 音箱本体运行） | [轨道 B (Dot 2)](#轨道-b亚马逊-echo-dot-2-rs03qr--aeobc--从原厂到开口对话完整指南) |
-| **小米小爱 Pro (`LX06`, 256 MB 内存版)** | `open-xiaoai` 开 Root SSH，`MemTotal ≥ 180,000 kB` | 音箱本体 `hm-core --slim` + `hm-gateway` + `hm-kws`（免刷机双系统） | **不需要**（100% 音箱本体运行） | [轨道 A (LX06)](#轨道-a小米小爱音箱-pro-lx06--256-mb--128-mb-自适应免刷机部署) |
-| **小米小爱 Pro (`LX06`, 128 MB · 有 NAS 推荐)** | `open-xiaoai` 开 Root SSH + 局域网 NAS 全量 Docker Core | 音箱装免编译 **瘦网关**（`--thin`，`~4 MiB` RAM）→ **NAS 全量 Docker `hm-core`**（Silero VAD） | **需要** | [轨道 A](#轨道-a小米小爱音箱-pro-lx06--256-mb--128-mb-自适应免刷机部署) + [轨道 C](#轨道-cnas--服务器全量-docker-部署128-mb-lx06-与全屋安卓终端中枢) |
-| **小米小爱 Pro (`LX06`, 128 MB · 无 NAS 尝鲜)** | `open-xiaoai` 开 Root SSH，`/data ≥ 5.5 MiB` | 音箱装免编译 **纯 ASR 模式**（`--standalone-asr`：`hm-core --slim` + `hm-gateway`，免 KWS） | **不需要**（单机独立运行） | [轨道 A (LX06)](#轨道-a小米小爱音箱-pro-lx06--256-mb--128-mb-自适应免刷机部署) |
+| **小米小爱 Pro (`LX06`, 256 MB · 已实机验收)** | `open-xiaoai` 开 Root SSH，`MemTotal ≥ 180,000 kB` | 音箱本体 `hm-core --slim` + `hm-gateway` + `hm-kws`（免刷机双系统） | **不需要**（100% 音箱本体运行） | [轨道 A (LX06)](#轨道-a小米小爱音箱-pro-lx06--256-mb--128-mb-自适应免刷机部署) |
+| **小米小爱 Pro (`LX06`, 128 MB · 实验性有 NAS)** | `open-xiaoai` 开 Root SSH + 局域网 NAS 全量 Docker Core | 实验性 **瘦网关**（`--thin`）→ **NAS 全量 Docker `hm-core`** *(维护者暂未在 128 MB 真机验收，请降低预期)* | **需要** | [轨道 A](#轨道-a小米小爱音箱-pro-lx06--256-mb--128-mb-自适应免刷机部署) + [轨道 C](#轨道-cnas--服务器全量-docker-部署128-mb-lx06-与全屋安卓终端中枢) |
+| **小米小爱 Pro (`LX06`, 128 MB · 无 NAS 不推荐)** | `open-xiaoai` 开 Root SSH，`/data ≥ 5.5 MiB` | 实验性 **纯 ASR 模式**（`--standalone-asr`）：开机仅剩 ~51 MiB 内存，极易高负载卡顿与唤醒困难 | **不需要** *(不推荐日常折腾)* | [轨道 A (LX06)](#轨道-a小米小爱音箱-pro-lx06--256-mb--128-mb-自适应免刷机部署) |
 | **安卓带屏音箱 / 86 屏 / 平板 / 废旧手机 / 斐讯 R1** | Android 5–16（零硬件刷机！） | **NAS / 电脑全量 Docker `hm-core`** + **Android 通用 APK**（`v2.3.19`） | **需要** *(或仅管理模式连音箱 Core)* | [轨道 C](#轨道-cnas--服务器全量-docker-部署128-mb-lx06-与全屋安卓终端中枢) + [轨道 D](#轨道-dandroid-通用终端带屏音箱--86-墙面屏--平板--废旧安卓手机) |
+
+> [!WARNING]
+> **关于 128 MB 批次小米 LX06（`MemTotal < 180,000 kB`）的如实说明（请降低预期）**：
+> 维护者手头目前只有并长期验收了 **256 MB 批次 LX06**，**所有 128 MB 模式目前均属实验性支持，尚未经过 128 MB 真机压测与验收**。128 MB 批次跑完原厂小爱服务后可用内存仅剩约 **51 MiB**；已有 128 MB 真机社区用户反馈，在保留原厂小爱共存的情况下容易出现 **卡顿、CPU load 严重过载、内存吃紧、唤醒困难（甚至连原厂“小爱同学”都变难唤醒）**。
+> - **无 NAS 单机模式（`--standalone-asr`）不推荐日常使用**：`/tmp` 是内存盘，解包 `hm-core`（~13.6 MiB）+ 运行态会把剩余内存压到极限，容易触发闪存反复换页导致卡死；仅保留作实验参考。
+> - **有 NAS 瘦网关模式（`--thin`）属实验性**：虽然音箱端内存占用低得多，但当前网关仍与原厂小爱共用麦克风且待机期默认运行实时采音/AEC、缺少本机 KWS，流畅度与唤醒体验仍明显不如 256 MB 批次。
+> - **务实建议**：想体验稳定顺滑的 LX06 双唤醒，**强烈建议使用 256 MB 批次**；如果手头只有 128 MB 且不想折腾调优，用闲置安卓手机 / 平板 / 86 墙面屏跑 **Android APK（`v2.3.19`）+ NAS Docker Core** 体验会好得多（已装到 128 MB LX06 随时可执行 `rm -rf /data/hm /data/init.sh && reboot` 一键恢复纯原厂）。
 
 ---
 
@@ -100,11 +107,11 @@ flowchart TD
 
 通过 **[yes999zc/home-mate-gateway-linux](https://github.com/yes999zc/home-mate-gateway-linux)** 部署时，守护进程自动读取 `/proc/meminfo` 的 `MemTotal` 内存容量，自动适配小米出厂的两种硬件批次：
 
-1. **256 MB 独立全本体 / 128 MB 双方案自适应分流**
-   - **256 MB 批次（`MemTotal >= 180,000 kB`）**：主包（`<= 6.0 MiB`）存放于 `/data/hm`，开机自动解压进 `120.9 MiB` `/tmp` 内存盘，本机独立运行 `hm-core --slim`、`:8930` 控制台、`hm-gateway` 与离线 `hm-kws`（自动采用实机标定的 `0.20 / 2.50` 灵敏度）。
-   - **128 MB 小内存批次（`MemTotal < 180,000 kB`，`/tmp` 约 59 MB）**：
-     - **有 NAS 推荐（`--thin` 瘦网关）**：默认自动进入瘦网关模式（`hm-lx06-thin.tar.xz` 仅 ~606 KB / 运行仅吃 ~4 MiB RAM），连接局域网 **NAS / 服务器全量 Docker `hm-core`**（享完整 Silero 神经网络 VAD）。
-     - **无 NAS 尝鲜（`--standalone-asr` 单机纯 ASR）**：跳过占用 50–68 MiB 的本地 `hm-kws`，在本机直接跑 `hm-core --slim`（`HM_VOICE_EVENTS=0` 防撑爆 `/tmp`）+ `hm-gateway` + `:8930` 控制台（净吃 ~26–31 MiB RAM，剩余 ~22–30 MiB），能量 VAD + 云端 ASR 唤醒，免 NAS 即可体验对话与 HA 控家。
+1. **已实机验收的 256 MB 独立全本体 / 实验性 128 MB 双方案**
+   - **256 MB 批次（`MemTotal >= 180,000 kB`，主力已验收型号）**：主包（`<= 6.0 MiB`）存放于 `/data/hm`，开机自动解压进 `120.9 MiB` `/tmp` 内存盘，本机独立运行 `hm-core --slim`、`:8930` 控制台、`hm-gateway` 与离线 `hm-kws`（自动采用实机标定的 `0.20 / 2.50` 灵敏度）。
+   - **128 MB 小内存批次（`MemTotal < 180,000 kB`，`/tmp` 约 59 MB — 实验性，请降低预期）**：
+     - **有 NAS 瘦网关（`--thin`，实验性）**：默认自动进入瘦网关模式（`hm-lx06-thin.tar.xz` 仅 ~607 KB），连接局域网 **NAS / 服务器全量 Docker `hm-core`**。无本机 KWS 且尚未在 128 MB 真机完成负载优化，共存期可能与原厂小爱争抢 CPU 或影响唤醒。
+     - **无 NAS 单机纯 ASR（`--standalone-asr`，实验性 / 不推荐日常使用）**：跳过本地 `hm-kws`，在本机跑 `hm-core --slim`（`HM_VOICE_EVENTS=0`）+ `hm-gateway` 走能量 VAD + 云端 ASR 唤醒。因 `/tmp` 占物理内存且原厂小爱后仅剩 ~51 MiB 可用，真机极易内存吃紧、load 过载和唤醒困难，仅作实验尝鲜，不建议当作主力。
 2. **不伤害原厂系统（双系统无损共存，零变砖风险）**
    - 原厂只读 SquashFS 分区 `mtd4 / mtd5` **0 字节修改**；随时执行 `rm -rf /data/hm /data/init.sh && reboot` 一键恢复纯原厂小爱。
 3. **唤醒词直切双系统（256 MB 双唤醒）**

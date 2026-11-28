@@ -74,10 +74,10 @@ flowchart TD
     D2 --> D3["Provision: ./tools/hm-provision.sh (--dry-run -> live) -> http://&lt;IP&gt;:8930<br/>👉 Use Track B &amp; Dot 2 AI Prompt"]
 
     LX06 --> L0["Prereq: Root SSH via open-xiaoai -> check MemTotal"]
-    L0 -->|"≥ 180,000 kB (256 MB)"| L256["On-Speaker Dual-Wake (No NAS)<br/>👉 Track A1 &amp; LX06 AI Prompt"]
-    L0 -->|"< 180,000 kB (128 MB)"| L128{"Have a LAN NAS / PC?"}
-    L128 -->|"Yes (Recommended)"| LThin["Track C NAS Full Docker Core + v0.0.56 Prebuilt --thin<br/>👉 Track A2 &amp; LX06 AI Prompt"]
-    L128 -->|"No (Trial)"| LAsr["v0.0.56 Prebuilt --standalone-asr (Energy VAD, No KWS)<br/>👉 Track A3 &amp; LX06 AI Prompt"]
+    L0 -->|"≥ 180,000 kB (256 MB · Verified)"| L256["On-Speaker Dual-Wake (No NAS)<br/>👉 Track A1 &amp; LX06 AI Prompt"]
+    L0 -->|"< 180,000 kB (128 MB · Experimental)"| L128{"Experimental — Have a LAN NAS?"}
+    L128 -->|"Yes (Experimental --thin)"| LThin["Track C NAS Full Docker Core + v0.0.56 --thin (Experimental)<br/>👉 Track A2 &amp; LX06 AI Prompt"]
+    L128 -->|"No (Not Recommended)"| LAsr["v0.0.56 --standalone-asr (Very Tight RAM · Experimental Only)<br/>👉 Track A3 (Consider Android / 256 MB)"]
 
     Android --> A1["Prereq: Track C Full Docker Core on NAS/Mac/PC (or existing speaker Core)"]
     A1 --> A2["Install v2.3.19 Signed APK (full-arm64 / universal / slim)"]
@@ -89,10 +89,17 @@ flowchart TD
 | What Hardware You Have | Prerequisites | Recommended Topology | External NAS/Server Needed? | Jump To |
 | :--- | :--- | :--- | :--- | :--- |
 | **Amazon Echo Dot 2 (`RS03QR` / `AEOBC`)** | `firebreak` unlock (`p10` backup) + upstream **EchoMuse `emOS`** + `em-wifi` | On-speaker Full `hm-core` + `hm-gateway` + `hm-kws` (7-mic + 160ms AEC + 12-LED ring) | **No** (100% on-speaker) | [Track B (Dot 2)](#track-b-amazon-echo-dot-2-rs03qr--aeobc--from-stock-to-talking) |
-| **Xiaomi LX06 (256 MB RAM)** | `open-xiaoai` Root SSH, `MemTotal ≥ 180,000 kB` | On-speaker `hm-core --slim` + `hm-gateway` + `hm-kws` (Scheme A dual-wake) | **No** (100% on-speaker) | [Track A (LX06)](#track-a-xiaomi-ai-speaker-pro-lx06--adaptive-256-mb--128-mb-deploy) |
-| **Xiaomi LX06 (128 MB · w/ NAS Recommended)** | `open-xiaoai` Root SSH + LAN NAS Full Docker Core | Prebuilt **Thin Gateway** (`--thin`, `~4 MiB` RAM) → **Full Docker `hm-core`** (Silero VAD) | **Yes** | [Track A](#track-a-xiaomi-ai-speaker-pro-lx06--adaptive-256-mb--128-mb-deploy) + [Track C](#track-c-nas--docker-full-core-multi-gateway-hub-for-128-mb-lx06--android) |
-| **Xiaomi LX06 (128 MB · No-NAS Trial)** | `open-xiaoai` Root SSH, `/data ≥ 5.5 MiB` | Prebuilt **Standalone Pure-ASR** (`--standalone-asr`: `hm-core --slim` + `hm-gateway`, no KWS) | **No** (100% on-speaker) | [Track A (LX06)](#track-a-xiaomi-ai-speaker-pro-lx06--adaptive-256-mb--128-mb-deploy) |
+| **Xiaomi LX06 (256 MB RAM · Verified)** | `open-xiaoai` Root SSH, `MemTotal ≥ 180,000 kB` | On-speaker `hm-core --slim` + `hm-gateway` + `hm-kws` (Scheme A dual-wake) | **No** (100% on-speaker) | [Track A (LX06)](#track-a-xiaomi-ai-speaker-pro-lx06--adaptive-256-mb--128-mb-deploy) |
+| **Xiaomi LX06 (128 MB · Experimental w/ NAS)** | `open-xiaoai` Root SSH + LAN NAS Full Docker Core | Experimental **Thin Gateway** (`--thin`) → **Full Docker `hm-core`** *(not yet hardware-verified by maintainer; lower expectations)* | **Yes** | [Track A](#track-a-xiaomi-ai-speaker-pro-lx06--adaptive-256-mb--128-mb-deploy) + [Track C](#track-c-nas--docker-full-core-multi-gateway-hub-for-128-mb-lx06--android) |
+| **Xiaomi LX06 (128 MB · No-NAS · Not Recommended)** | `open-xiaoai` Root SSH, `/data ≥ 5.5 MiB` | Experimental **Standalone Pure-ASR** (`--standalone-asr`): RAM is extremely tight (~51 MiB free after stock XiaoAi) — prone to high load & poor wake | **No** *(not recommended for daily use)* | [Track A (LX06)](#track-a-xiaomi-ai-speaker-pro-lx06--adaptive-256-mb--128-mb-deploy) |
 | **Android Display / 86 Panel / Tablet / Phone / R1** | Android 5–16 (Zero hardware flashing!) | **Full Docker `hm-core`** on NAS/PC + **Android Universal APK** (`v2.3.19`) | **Yes** *(or Manage-Only on speaker Core)* | [Track C](#track-c-nas--docker-full-core-multi-gateway-hub-for-128-mb-lx06--android) + [Track D](#track-d-android-universal-terminal-smart-displays-86-panels-tablets--old-phones) |
+
+> [!WARNING]
+> **Honest Expectation Notice for 128 MB Xiaomi LX06 (`MemTotal < 180,000 kB`)**:
+> The maintainer only owns and hardware-tests the **256 MB LX06 batch**; all **128 MB modes are currently Experimental and unverified on physical 128 MB hardware**. Stock XiaoAi already leaves only ~51 MiB of free RAM on 128 MB units, and community testers have reported **severe lag, high CPU load, memory pressure, and degraded wake reliability (including stock "XiaoAi" wake)** when running alongside native XiaoAi.
+> - **Not recommended without a NAS (`--standalone-asr`)**: Unpacking `hm-core` (~13.6 MiB) into RAM-backed `/tmp` plus runtime memory leaves almost zero page cache, easily causing flash thrashing and stutter.
+> - **With a NAS (`--thin`)**: RAM footprint is much smaller, but the current gateway still shares the mic with stock XiaoAi while running continuous capture/AEC without on-device KWS, so responsiveness and stability are still noticeably below 256 MB.
+> - **Our honest recommendation**: For a smooth LX06 dual-wake experience, use the **256 MB batch**; if you only have a 128 MB unit and want hassle-free daily use, a **repurposed Android phone/tablet/86 panel + NAS Docker Core** delivers a far better experience (and you can always restore a 128 MB LX06 to 100% stock with `rm -rf /data/hm /data/init.sh && reboot`).
 
 ---
 
@@ -100,11 +107,11 @@ flowchart TD
 
 Deployed via **[yes999zc/home-mate-gateway-linux](https://github.com/yes999zc/home-mate-gateway-linux)**, Home Mate automatically inspects `MemTotal` in `/proc/meminfo` and adapts to both Xiaomi factory batches:
 
-1. **Adaptive 256 MB On-Speaker vs. Dual 128 MB Modes**:
-   - **256 MB batch (`MemTotal >= 180,000 kB`)**: Unpacks the `<= 6.0 MiB` Scheme A archive (`/data/hm/hm-bundle.tar.xz`) into `120.9 MiB` `/tmp` RAM tmpfs on boot — `hm-core --slim`, Vue 3 Console (`:8930`), `hm-gateway`, and `hm-kws` (with hardware-calibrated `0.20 / 2.50` KWS sensitivity) run **100% on-speaker**.
-   - **128 MB batch (`MemTotal < 180,000 kB`, ~59 MB `/tmp`)**:
-     - **With NAS (Recommended — `--thin`)**: Auto-enters **Thin Gateway mode** (`hm-lx06-thin.tar.xz`, ~606 KB compressed / ~4 MiB RAM), dialing your **NAS / server Full Docker `hm-core`** (with in-process Silero neural VAD) over private LAN `:8932` or SSH reverse tunnel.
-     - **Without NAS (Trial — `--standalone-asr`)**: Skips local `hm-kws` (saving ~50–68 MiB RAM) and runs `hm-core --slim` (`HM_VOICE_EVENTS=0` to protect 58 MB `/tmp`) + `hm-gateway` + `:8930` Console directly on the speaker (~26–31 MiB net RAM, ~22–30 MiB free headroom) using energy VAD + cloud ASR wake.
+1. **Verified 256 MB On-Speaker vs. Experimental 128 MB Modes**:
+   - **256 MB batch (`MemTotal >= 180,000 kB`, Hardware-Verified Primary Target)**: Unpacks the `<= 6.0 MiB` Scheme A archive (`/data/hm/hm-bundle.tar.xz`) into `120.9 MiB` `/tmp` RAM tmpfs on boot — `hm-core --slim`, Vue 3 Console (`:8930`), `hm-gateway`, and `hm-kws` (with hardware-calibrated `0.20 / 2.50` KWS sensitivity) run **100% on-speaker**.
+   - **128 MB batch (`MemTotal < 180,000 kB`, ~59 MB `/tmp` — Experimental / Lower Expectations)**:
+     - **With NAS (Experimental — `--thin`)**: Auto-enters **Thin Gateway mode** (`hm-lx06-thin.tar.xz`, ~607 KB compressed), dialing your **NAS / server Full Docker `hm-core`** over private LAN `:8932` or SSH reverse tunnel. Lacks on-device KWS and has not yet been stress-tested on physical 128 MB hardware; high CPU load or wake contention with stock XiaoAi may occur.
+     - **Without NAS (Experimental / Not Recommended — `--standalone-asr`)**: Skips local `hm-kws` and runs `hm-core --slim` (`HM_VOICE_EVENTS=0`) + `hm-gateway` on the speaker using energy VAD + cloud ASR wake. Because `/tmp` is RAM-backed and stock XiaoAi leaves only ~51 MiB available, real-world units frequently hit memory pressure, high load, and poor wake reliability — kept only for experimentation, not daily use.
 2. **Zero Damage to Stock Firmware (Dual-System Coexistence)**:
    - **0 bytes modified in stock SquashFS**: Factory read-only `mtd4 (system0)` and `mtd5 (system1)` partitions remain **100% untouched** (zero brick risk).
    - **1-Line Factory Restore**: Run `rm -rf /data/hm /data/init.sh && reboot` over SSH to return to 100% stock state.
